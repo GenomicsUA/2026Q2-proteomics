@@ -8,7 +8,7 @@
 2. Базові навички роботи з командним рядком Linux.
 
 ## Рекомендовані матеріали для ознайомлення перед початком навчання:
-1. Сім коротких лекцій з (основ масс-спектрометрії)[https://www.youtube.com/watch?v=bS78rIYvFBE&list=PLXxp6nsBenSX_W8DiOocKJ0laNauYNdYl].
+1. [Сім коротких лекцій з основ мас-спектрометрії.](https://www.youtube.com/watch?v=bS78rIYvFBE&list=PLXxp6nsBenSX_W8DiOocKJ0laNauYNdYl)
 
 ## Розклад:
 
