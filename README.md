@@ -1,11 +1,11 @@
-# 2026Q2-proteomics
 # Курс Геноміки ЮА з аналізу протеомних даних
-
-Посилання на нашому сайті genomics.org.ua(TBA).
 
 ## Передумови:
 1. Базові навички програмування на мові R.
+    - [Вступ в R від Dariia Mykhailyshyna](https://www.youtube.com/playlist?list=PLzBhHetlcY15DyxCaXyB-m39HlQzzOAtC). Рекомендовані заняття:M1S01-06, M1S10-11. 
 2. Базові навички роботи з командним рядком Linux.
+    - [Як користуватися командним рядком Linux на Windows](https://www.howtogeek.com/790062/how-to-install-bash-on-windows-11/).
+    - [Уроки w3schools](https://www.w3schools.com/bash/index.php). Рекомендовані теми: Bash Commands, Text Processing, File Compression.
 
 ## Рекомендовані матеріали для ознайомлення перед початком навчання:
 1. [Сім коротких лекцій з основ мас-спектрометрії.](https://www.youtube.com/watch?v=bS78rIYvFBE&list=PLXxp6nsBenSX_W8DiOocKJ0laNauYNdYl)
