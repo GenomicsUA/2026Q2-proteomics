@@ -2,7 +2,7 @@
 
 ## Передумови:
 1. Базові навички програмування на мові R.
-    - [Вступ до R від Dariia Mykhailyshyna.](https://www.youtube.com/playlist?list=PLzBhHetlcY15DyxCaXyB-m39HlQzzOAtC) Рекомендовані заняття:M1S01-06, M1S10-11. 
+    - [Вступ до R від Dariia Mykhailyshyna.](https://www.youtube.com/playlist?list=PLzBhHetlcY15DyxCaXyB-m39HlQzzOAtC) Рекомендовані заняття: M1S01-06, M1S10-11. 
 2. Базові навички роботи з командним рядком Linux.
     - [Як користуватися командним рядком Linux на Windows.](https://www.howtogeek.com/790062/how-to-install-bash-on-windows-11/)
     - [Уроки w3schools.](https://www.w3schools.com/bash/index.php) Рекомендовані теми: Bash Commands, Text Processing, File Compression.
