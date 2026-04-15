@@ -28,6 +28,6 @@
 | 09 | 28.05.2026 Четверг  | 19:00     | De novo sequencing and immunopeptidomics data analysis. Part 2 | Yehor Horokhovskyi                          |
 | 10 | 06.06.2026 Субота   | 19:00     | Proteolysis for drug discovery                                         | Bohdana Sokolova                              |
 | 11 | 11.06.2026 Четверг  | 19:00     | Special and single-cell proteomics                           | Elena Melnik                                  |
-| 12 | 13.06.2026 Субота  | 17:00     | Special and single-cell proteomics                           | Elena Melnik                                  |
-| 13 | 17.06.2026 Середа   | 19:00     | Proteomics community                                         | Julian Uszkoreit, Valeriia Vasylieva                                           |
+| 12 | 13.06.2026 Субота  | 19:00     | Special and single-cell proteomics                           | Elena Melnik                                  |
+| 13 | 17.06.2026 Середа   | 17:00     | Proteomics community                                         | Julian Uszkoreit, Valeriia Vasylieva                                           |
 | 14 | 20.06.2026 Субота  | 19:00     | Projects presentation                                        | TBA                                           |
