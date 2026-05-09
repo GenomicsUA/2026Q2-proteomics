@@ -12,7 +12,8 @@ Follow directions and copy code blocks into WSL shell.
 
 ```bash
 docker run -it --rm \
--v ~/data_s04:/data_s04 \
+-u 0 \
+-v ~/projects/2026Q2-proteomics/data_s04:/data \
 biocontainers/tpp:v5.2_cv1 bash
 ```
 
@@ -21,43 +22,64 @@ Now you are inside docker container.
 Set input files as variables.
 
 ```bash
-MGF="data_s04/ms/130327_o2_01_hu_C1_2hr.mgf"
-FASTA="data_s04/db/UP000005640/UP000005640_9606.fasta"
+MGF="130327_o2_01_hu_C1_2hr.mgf"
+FASTA="UP000005640_9606.fasta"
 BASE=$(basename "${MGF}" .mgf)
+MZML="${BASE}.mzML"
+```
+
+Convert file.
+
+```bash
+msconvert $MGF --mzML
 ```
 
 Generate Comet parameters file.
 
 ```bash
-comet -p > comet.params
+comet -p
 ```
 
-Check `comet.params` contents. Navigate with up/down arrows. To exit press `Ctrl+C`.
+Check `comet.params.new` contents. Navigate with up/down arrows. To exit press `Ctrl+C`.
 
 ```bash
-less comet.params
+less comet.params.new
 ```
-Set database path inside `comet.params` file.
+Set database path and mode inside `comet.params.new` file.
 
 ```bash
-sed -i "s|^database_name =.*|database_name = ${FASTA}|" comet.params
+sed -i "s|^database_name =.*|database_name = ${FASTA}|" comet.params.new
+sed -i "s|^decoy_search =.*|decoy_search = 1|" comet.params.new
+```
+
+Add another variable modification - phosphorilation.
+
+```bash
+sed -i \
+'s/^variable_mod02.*/variable_mod02 = 79.966331 STY 0 3 -1 0 0/' \
+comet.params.new
+```
+
+Change default parameters to high resolution mode.
+
+```bash
+sed -i "s|^fragment_bin_tol =.*|fragment_bin_tol = 0.02|" comet.params.new
+sed -i "s|^fragment_bin_offset =.*|fragment_bin_offset = 0.0|" comet.params.new
+sed -i "s|^theoretical_fragment_ions =.*|theoretical_fragment_ions = 0|" comet.params.new
+sed -i "s|^spectrum_batch_size =.*|spectrum_batch_size = 10000|" comet.params.new
 ```
 
 Run search.
 
 ```bash
-comet -Pcomet.params $MGF
+comet -Pcomet.params.new $MZML
 ```
 
 Check if expected output exist.
 
 ```bash
 PEPXML="${BASE}.pep.xml"
-
-if [[ ! -f $PEPXML ]]; then
-    echo "ERROR: pepXML not produced"
-    exit 1
-fi
+ls $PEPXML ]]
 ```
 
 Check pepXML contents. Note the structure.
@@ -109,41 +131,26 @@ bash s04/sample_tpp_run.sh
 
 # Extra. Make TPP output readable by R
 
-Turn pepXML and protXML into tsv.
+Install xml parcer.
 
 ```bash
-PepXML2TSV interact.ptm.pep.xml > interact.ptm.pep.tsv
-ProteinProphet2TSV interact.prot.xml > interact.prot.tsv
+apt-get update
+apt-get install -y xmlstarlet
 ```
 
-OR
-
-Convert to mzIdentML and read file with `mzID` library in R. Works for PSM level only.
+Convert to mzIdentML and read file with `mzID` library in R.
 
 ```bash
-PepXML2MzIdentML interact.ptm.pep.xml psm.mzid
+tpp2mzid interact.ptm.pep.xml
+tpp2mzid interact.prot.xml
 ```
 
 # Extra. Sample code for R parsing
 
-For `.tsv`.
-
-```r
-install.packages(c("readr", "dplyr"))
-
-library(readr)
-library(dplyr)
-
-psm <- read_tsv("interact.ptm.pep.tsv")
-prot <- read_tsv("interact.prot.tsv")
-```
-
-For `.mzid`.
-
 ```r
 library(mzID)
 
-mzid <- mzID("psms.mzid")
+mzid <- mzID("interact.ptm.pep.mzid")
 
 psm <- flatResults(mzid)
 ```

@@ -26,19 +26,19 @@ cd 2026Q2-proteomics
 
 # Get data
 
-Download one spectra file from PRIDE Archive.
+Download one spectra file from PRIDE Archive. This will take ~5 minutes.
 
 ```bash
-mkdir -p data_s04/ms
-wget -P data_s04/ms https://ftp.pride.ebi.ac.uk/pride/data/archive/2016/02/PXD002057/130327_o2_01_hu_C1_2hr.mgf
+mkdir data_s04
+wget -P data_s04/ https://ftp.pride.ebi.ac.uk/pride/data/archive/2016/02/PXD002057/130327_o2_01_hu_C1_2hr.mgf
+#https://ftp.pride.ebi.ac.uk/pride/data/archive/2016/02/PXD002057/130327_o2_01_hu_C1_2hr.raw
 ```
 
 Download proteins database from UniProt.
 
 ```bash
-mkdir -p data_s04/db
-wget -P data_s04/db https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/Eukaryota/UP000005640/UP000005640_9606.fasta.gz
-gunzip data_s04/db/UP000005640/UP000005640_9606.fasta.gz
+wget -P data_s04/ https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/Eukaryota/UP000005640/UP000005640_9606.fasta.gz
+gunzip data_s04/db/UP000005640_9606.fasta.gz
 ```
 
 # Install docker for TPP

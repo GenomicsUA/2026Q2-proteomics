@@ -7,14 +7,10 @@ set -euo pipefail
 # INPUT FILES
 ############################################
 
-MGF="ms/130327_o2_01_hu_C1_2hr.mgf"
-FASTA="db/UP000005640/UP000005640_9606.fasta"
-
-############################################
-# OUTPUT PREFIX
-############################################
-
+MGF="130327_o2_01_hu_C1_2hr.mgf"
+FASTA="UP000005640_9606.fasta"
 BASE=$(basename "${MGF}" .mgf)
+MZML="${BASE}.mzML"
 
 ############################################
 # CHECK REQUIRED TOOLS
@@ -28,12 +24,18 @@ which PTMProphetParser
 which ProteinProphet
 
 ############################################
+# CONVERT FILE
+############################################
+
+msconvert $MGF --mzML
+
+############################################
 # GENERATE DEFAULT COMET PARAMETERS
 ############################################
 
 echo "Generating Comet parameters..."
 
-comet -p > comet.params
+comet -p
 
 ############################################
 # MODIFY COMET PARAMETERS
@@ -41,7 +43,13 @@ comet -p > comet.params
 
 echo "Setting FASTA database..."
 
-sed -i "s|^database_name =.*|database_name = ${FASTA}|" comet.params
+sed -i "s|^database_name =.*|database_name = ${FASTA}|" comet.params.new
+sed -i "s|^decoy_search =.*|decoy_search = 1|" comet.params.new
+sed -i 's/^variable_mod02.*/variable_mod02 = 79.966331 STY 0 3 -1 0 0/' comet.params.new
+sed -i "s|^fragment_bin_tol =.*|fragment_bin_tol = 0.02|" comet.params.new
+sed -i "s|^fragment_bin_offset =.*|fragment_bin_offset = 0.0|" comet.params.new
+sed -i "s|^theoretical_fragment_ions =.*|theoretical_fragment_ions = 0|" comet.params.new
+sed -i "s|^spectrum_batch_size =.*|spectrum_batch_size = 10000|" comet.params.new
 
 ############################################
 # RUN COMET SEARCH
@@ -51,7 +59,7 @@ echo "Running Comet..."
 
 comet \
 -Pcomet.params \
-"${MGF}"
+"${MZML}"
 
 ############################################
 # EXPECTED OUTPUT:
@@ -59,11 +67,7 @@ comet \
 ############################################
 
 PEPXML="${BASE}.pep.xml"
-
-if [[ ! -f "${PEPXML}" ]]; then
-    echo "ERROR: pepXML not produced"
-    exit 1
-fi
+ls $PEPXML
 
 ############################################
 # RUN PEPTIDEPROPHET
