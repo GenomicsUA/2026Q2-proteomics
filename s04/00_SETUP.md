@@ -1,6 +1,30 @@
-# Get data
+# Copy GitHub repository with code
 
-Open WSL in `2026Q2-proteomics` directory.
+Open WSL in Ubuntu bash shell mode.
+
+Check if you have `git` installed.
+
+```bash
+git --version
+```
+
+If not, install. You will need to type in your password.
+
+```bash
+sudo apt update
+sudo apt install -y git
+```
+
+Get local copy of course repository in `projects` folder and enter it.
+
+```bash
+mkdir -p ~/projects
+cd ~/projects
+git clone https://github.com/GenomicsUA/2026Q2-proteomics.git
+cd 2026Q2-proteomics
+```
+
+# Get data
 
 Download one spectra file from PRIDE Archive.
 

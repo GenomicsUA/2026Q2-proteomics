@@ -1,6 +1,11 @@
 # Get started
 
 Open WSL in `2026Q2-proteomics` directory.
+
+```bash
+cd ~/projects/2026Q2-proteomics
+```
+
 Follow directions and copy code blocks into WSL shell.
 
 # Run TPP docker
