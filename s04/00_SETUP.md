@@ -38,7 +38,7 @@ Download proteins database from UniProt.
 
 ```bash
 wget -P data_s04/ https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/Eukaryota/UP000005640/UP000005640_9606.fasta.gz
-gunzip data_s04/db/UP000005640_9606.fasta.gz
+gunzip data_s04/UP000005640_9606.fasta.gz
 ```
 
 # Install docker for TPP
