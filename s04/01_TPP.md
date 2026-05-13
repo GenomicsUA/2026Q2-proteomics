@@ -79,7 +79,7 @@ Check if expected output exist.
 
 ```bash
 PEPXML="${BASE}.pep.xml"
-ls $PEPXML ]]
+ls $PEPXML
 ```
 
 Check pepXML contents. Note the structure.
@@ -144,6 +144,18 @@ Convert to mzIdentML and read file with `mzID` library in R.
 tpp2mzid interact.ptm.pep.xml
 tpp2mzid interact.prot.xml
 ```
+
+Correct the MZIdentML header so it opens in R.
+
+```bash
+input="interact.ptm.pep.mzid"
+output="interact_1.ptm.pep.mzid"
+
+sed '/<MzIdentML /{
+    s|http://psidev.info/psi/pi/mzIdentML/1\.2|http://psidev.info/psi/pi/mzIdentML/1.1|g
+}' "$input" > "$output"
+```
+Do the same for `interact.prot.xml`.
 
 # Extra. Sample code for R parsing
 
