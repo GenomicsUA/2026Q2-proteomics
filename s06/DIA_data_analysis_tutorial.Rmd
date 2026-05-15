@@ -1,0 +1,693 @@
+At first you'll need to:
+
+1) Download the "report.pg_matrix_test.tsv", "experiment_annotations_test.tsv" and "all_proteins.csv" in your working directory
+
+2) install all the necessary packages for our work
+
+```{r eval=FALSE}
+install.packages(c("mpwR", "renv", "tidyverse", "reshape2"))
+renv::install("bioc::ComplexHeatmap")
+renv::install("bioc::limma")
+renv::install("bioc::MSnbase")
+renv::install("bioc::SummarizedExperiment")
+renv::install("bioc::cmapR")
+renv::install("bioc::ConsensusClusterPlus")
+
+renv::install("Nesvilab/FragPipeAnalystR")
+
+renv::install("nicolerg/ssGSEA2")
+
+if (!require("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+BiocManager::install("AnnotationDbi")
+BiocManager::install("org.Hs.eg.db")
+BiocManager::install("GO.db")
+```
+
+Congratulations! Now you are ready to go through the tutorial!
+
+Load your libraries
+
+```{r eval=FALSE}
+library(FragPipeAnalystR)
+library(tidyverse)
+library(UpSetR)
+library(reshape2)
+library(org.Hs.eg.db)
+library(AnnotationDbi)
+library(GO.db)
+```
+
+We will start from creating the SummarizedExperiment object which contains the information about abundances of different proteins in different samples and the ex^perimental setup.
+
+```{r eval=FALSE}
+se <- make_se_from_files(
+  "report.pg_matrix_test.tsv",
+  "experiment_annotations_test.tsv",
+  type = "DIA"
+)
+```
+
+Now let's perform some quality control (QC) steps.
+
+```{r eval=FALSE}
+pdf("PCA_test.pdf", width = 14, height = 8); plot_pca(se); dev.off()
+pdf("Correlation_test.pdf", width = 10, height = 10); plot_correlation_heatmap(se); dev.off()
+pdf("Missing_test.pdf", width = 10, height = 10); plot_missval_heatmap(se); dev.off()
+pdf("Features_test.pdf", width = 20, height = 10); plot_feature_numbers(se); dev.off()
+```
+
+What do you think about the quality of this data?
+
+Let's explore the missing values a little bit more
+
+```{r eval=FALSE}
+df<-assay(se)
+MVs <- rowSums(is.na(df)) / ncol(df)
+MVs<-MVs[which(MVs!=0)]
+MVs<-MVs[which(MVs!=1)]
+
+intensities <- rowMeans(df, na.rm = TRUE)
+intensities<-intensities[which(names(intensities) %in% names(MVs))]
+
+
+data<-data.frame("Intensity"=intensities, "MVs"=MVs)
+ggplot(data, aes(x=Intensity, y=MVs)) + 
+  geom_point()
+```
+
+
+What does this plot tell you about your missing values?
+
+Let's finally impute them!
+
+```{r eval=FALSE}
+se_imp<-manual_impute(se)
+
+df_imp<-assay(se_imp)
+
+# Extract condition names
+conds <- sub("_[^_]+$", "", colnames(df))
+
+# Split column indices by condition
+cond_names <- split(colnames(df), conds)
+
+# For each condition, count NAs per row
+na_counts <- sapply(cond_names, function(cols) {
+  rowSums(is.na(df[, cols, drop = FALSE]))
+})
+
+# Convert to data frame
+na_counts <- as.data.frame(na_counts)
+
+cond_sizes <- sapply(cond_names, length)
+
+all_na  <- sweep(na_counts, 2, cond_sizes, `==`)
+two_na <- sweep(na_counts, 2, cond_sizes - 1, `==`)
+
+rows_with_allna <- apply(all_na, 1, any)
+rows_with_twona <- apply(two_na, 1, any)
+
+# Row indices in original df
+rows_to_fix <- which(rowSums(all_na) > 0)
+# Loop over rows
+for (r in rows_to_fix) {
+  # For each condition that is all-NA in this row
+  conds_all_na <- colnames(all_na)[all_na[r, ]]
+  
+  for (cond in conds_all_na) {
+    cols <- cond_names[[cond]]
+    df_imp[r, cols] <- 0   # replace NA with 0
+  }
+}
+
+
+rows_to_fix <- which(rowSums(two_na) > 0)
+# Loop over rows
+for (r in rows_to_fix) {
+  conds_two_na <- colnames(two_na)[two_na[r, ]]
+  
+  for (cond in conds_two_na) {
+    cols <- cond_names[[cond]]
+    
+    # Replace ONLY the NA values
+    na_idx <- is.na(df[r, cols])
+    df_imp[r, cols][na_idx] <- 0
+  }
+}
+
+assay(se_imp)<-df_imp
+
+pdf("PCA_after_imputation_test.pdf", width = 14, height = 8); plot_pca(se_imp); dev.off()
+
+```
+
+We need to check if our imputation did not mess up with our data (did not skew significantly our intensity distributions or something)
+
+```{r eval=FALSE}
+obs <- as.vector(as.matrix(df))
+obs <- obs[!is.na(obs)]
+imp <- as.vector(as.matrix(df_imp))
+imp <- imp[is.na(as.matrix(df))]
+df_plot <- data.frame(
+  Intensity = c(obs, imp),
+  Type = c(rep("Observed", length(obs)), rep("Imputed", length(imp)))
+)
+
+# Plot densities
+ggplot(df_plot, aes(x = Intensity, color = Type, fill = Type)) +
+  geom_density(alpha = 0.3) +
+  scale_color_manual(values = c("blue", "red")) +
+  scale_fill_manual(values = c("blue", "red")) +
+  xlab("log2 intensity") + ylab("Density") +
+  theme_minimal()
+```
+
+So what do you think? Looks good or not? Why?
+
+```{r eval=FALSE}
+frac_missing <- rowSums(is.na(df)) / ncol(df)
+mean_intensity <- rowMeans(df_imp)
+
+plot(mean_intensity, frac_missing,
+     xlab = "Mean log2 intensity (after imputation)",
+     ylab = "Fraction originally missing",
+     pch = 16, col = rgb(0,0,1,0.5))
+```
+
+In order to compare protein abundances between different samples we need to normalize their medians. But how does it look before normalization?
+
+```{r eval=FALSE}
+# Flatten assay data for plotting
+mat <- assay(se_imp)  # your SummarizedExperiment after imputation
+df_plot <- melt(mat)
+colnames(df_plot) <- c("Protein", "Sample", "Intensity")
+df_plot$Condition <- sub("_(?!.*_).*", "", df_plot$Sample, perl = TRUE)
+
+ggplot(df_plot, aes(x = Sample, y = Intensity, fill = Condition)) +
+  geom_boxplot(outlier.size = 0.5, alpha = 0.7) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ylab("log2 intensity") +
+  xlab("Sample")
+```
+
+Now let's normalize and check how it looks after.
+
+```{r eval=FALSE}
+se_imp_norm<-MD_normalization(se_imp)
+
+mat <- assay(se_imp_norm)  # your SummarizedExperiment after imputation
+df_plot <- melt(mat)
+colnames(df_plot) <- c("Protein", "Sample", "Intensity")
+df_plot$Condition <- sub("_(?!.*_).*", "", df_plot$Sample, perl = TRUE)
+
+ggplot(df_plot, aes(x = Sample, y = Intensity, fill = Condition)) +
+  geom_boxplot(outlier.size = 0.5, alpha = 0.7) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ylab("log2 intensity") +
+  xlab("Sample")
+```
+
+Finally, my friends, the moment of truth! We are going to perform differential abundance analysis!!
+
+```{r eval=FALSE}
+final_contrasts <- c("C13.A_vs_C13.B", "C13.A_vs_C13.C", "C13.B_vs_C13.C")
+
+de_results <- test_limma(se_imp_norm, type = "manual", test=final_contrasts) 
+de_results_updated <- add_rejections(de_results)
+
+for (ct in final_contrasts) {
+  pdf(file.path(paste0(ct, ".pdf")))
+  print(plot_volcano(de_results_updated, ct))
+  dev.off()
+}
+
+for (ct in final_contrasts) {
+  
+  padj_col <- paste0(ct, "_p.adj")
+  
+  sig <- de_results_updated@elementMetadata[
+    !is.na(de_results_updated@elementMetadata[[padj_col]]) &
+      de_results_updated@elementMetadata[[padj_col]] < 0.05,
+  ]
+  
+  write.csv(
+    sig[,c(colnames(sig)[1:8],colnames(sig)[grepl(ct, colnames(sig))])],
+    file = file.path(paste0(ct, ".csv")),
+    row.names = FALSE
+  )
+}
+
+
+```
+
+
+I'll show you another fun type of plot:
+
+```{r eval=FALSE}
+
+upset_prots<-c()
+upset_conds<-c()
+
+for (ct in final_contrasts) {
+  
+  padj_col <- paste0(ct, "_p.adj")
+  sig <- de_results_updated@elementMetadata[
+    !is.na(de_results_updated@elementMetadata[[padj_col]]) &
+      de_results_updated@elementMetadata[[padj_col]] < 0.05 &
+      de_results_updated@elementMetadata[[paste0(ct, "_significant")]]==TRUE,
+  ]$Protein.Group
+  upset_prots <- c(upset_prots,sig)
+  upset_conds<-c(upset_conds, rep(ct, length(sig)))
+} 
+upset_df<-data.frame("Proteins" = upset_prots, "Contrasts" = upset_conds)
+
+upset_list<-list("C13.A_vs_C13.B" = upset_df$Proteins[which(upset_df$Contrasts == unique(upset_df$Contrasts)[1])], "C13.A_vs_C13.C" = upset_df$Proteins[which(upset_df$Contrasts == unique(upset_df$Contrasts)[2])], "C13.B_vs_C13.C" = upset_df$Proteins[which(upset_df$Contrasts == unique(upset_df$Contrasts)[3])])
+
+plot_Upset(upset_list)
+
+```
+
+Now after we saw which proteins are differentially abundant between conditions let's see which GO terms are enriched between conditions:
+
+```{r eval=FALSE}
+#Helper functions
+first_uniprot <- function(x) {
+  
+  x <- as.character(x)
+  
+  sapply(
+    strsplit(x, ";"),
+    `[`,
+    1
+  )
+}
+
+run_go_binomial <- function(genes,
+                            go_annot,
+                            background) {
+  
+  # Keep first protein accession only
+  genes <- first_uniprot(genes)
+  background <- first_uniprot(background)
+  
+  # Remove duplicates
+  genes <- unique(genes)
+  background <- unique(background)
+  
+  # Number of proteins
+  n <- length(genes)
+  
+  # GO mappings
+  bg_go <- go_annot[
+    go_annot$UNIPROT %in% background,
+  ]
+  
+  fg_go <- go_annot[
+    go_annot$UNIPROT %in% genes,
+  ]
+  
+  # GO term counts
+  bg_counts <- table(bg_go$GO)
+  fg_counts <- table(fg_go$GO)
+  
+  # Results table
+  res <- data.frame(
+    GO = names(fg_counts),
+    k = as.integer(fg_counts)
+  )
+  
+  # Background frequency
+  res$bg_freq <- as.numeric(
+    bg_counts[res$GO]
+  ) / length(background)
+  
+  # Binomial enrichment test
+  res$pval <- pbinom(
+    res$k - 1,
+    n,
+    res$bg_freq,
+    lower.tail = FALSE
+  )
+  
+  # Multiple testing correction
+  res$adj.p <- p.adjust(
+    res$pval,
+    method = "BH"
+  )
+  
+  # Sort results
+  res <- res[
+    order(res$adj.p),
+  ]
+  
+  rownames(res) <- NULL
+  
+  res
+}
+
+annotate_go_terms <- function(go_res) {
+  
+  term_names <- AnnotationDbi::select(
+    GO.db,
+    keys = go_res$GO,
+    columns = c(
+      "TERM",
+      "ONTOLOGY"
+    ),
+    keytype = "GOID"
+  )
+  
+  go_res <- merge(
+    go_res,
+    term_names,
+    by.x = "GO",
+    by.y = "GOID",
+    all.x = TRUE
+  )
+  
+  # Human-readable ontology names
+  go_res$ONTOLOGY <- factor(
+    go_res$ONTOLOGY,
+    levels = c(
+      "MF",
+      "BP",
+      "CC"
+    ),
+    labels = c(
+      "Molecular Function",
+      "Biological Process",
+      "Cellular Component"
+    )
+  )
+  
+  go_res
+}
+
+plot_go <- function(go_res,
+                    top_n = 20,
+                    alpha = 0.05,
+                    title = "") {
+  
+  # Significant terms only
+  sig <- go_res[
+    go_res$adj.p < alpha,
+  ]
+  
+  if (nrow(sig) == 0) {
+    return(NULL)
+  }
+  
+  # Sort by adjusted p-value
+  sig <- sig[
+    order(sig$adj.p),
+  ]
+  
+  # Keep top terms
+  sig <- sig[
+    1:min(top_n, nrow(sig)),
+  ]
+  
+  # Avoid log10(0)
+  sig$adj.p[
+    sig$adj.p == 0
+  ] <- .Machine$double.xmin
+  
+  # Labels
+  go_labels <- paste0(
+    sig$TERM,
+    " (",
+    sig$GO,
+    ")"
+  )
+  
+  # Dynamic left margin
+  max_chars <- max(
+    nchar(go_labels)
+  )
+  
+  left_mar <- min(
+    60,
+    max(
+      20,
+      ceiling(max_chars * 0.6)
+    )
+  )
+  
+  par(
+    mar = c(
+      5,
+      left_mar,
+      4,
+      2
+    )
+  )
+  
+  # Plot
+  barplot(
+    -log10(sig$adj.p),
+    names.arg = go_labels,
+    horiz = TRUE,
+    las = 2,
+    main = title,
+    xlab = "-log10(adj.p)",
+    col = "steelblue"
+  )
+}
+
+save_go_category <- function(go_res,
+                             ontology_name,
+                             contrast,
+                             direction) {
+  
+  # Filter ontology
+  sub <- go_res[
+    go_res$ONTOLOGY == ontology_name,
+  ]
+  
+  # Skip empty results
+  if (nrow(sub) == 0) {
+    return(NULL)
+  }
+  
+  # Ontology abbreviation
+  ont_short <- c(
+    "Biological Process" = "BP",
+    "Molecular Function" = "MF",
+    "Cellular Component" = "CC"
+  )[ontology_name]
+  
+  # -----------------------------------------------------
+  # Save plot
+  # -----------------------------------------------------
+  
+  pdf(
+    paste0(
+      contrast,
+      "_",
+      direction,
+      "_",
+      ont_short,
+      ".pdf"
+    ),
+    width = 14,
+    height = 8
+  )
+  
+  plot_go(
+    sub,
+    title = paste(
+      contrast,
+      direction,
+      ontology_name
+    )
+  )
+  
+  dev.off()
+  
+  # -----------------------------------------------------
+  # Save table
+  # -----------------------------------------------------
+  
+  write.csv(
+    sub,
+    paste0(
+      contrast,
+      "_",
+      direction,
+      "_",
+      ont_short,
+      ".csv"
+    ),
+    row.names = FALSE
+  )
+}
+
+# Building GO annotation table
+
+go_table <- AnnotationDbi::select(
+  org.Hs.eg.db,
+  keys = keys(
+    org.Hs.eg.db,
+    keytype = "UNIPROT"
+  ),
+  columns = c(
+    "GO",
+    "ONTOLOGY"
+  ),
+  keytype = "UNIPROT"
+)
+
+# Remove missing GO annotations
+go_table <- go_table[
+  !is.na(go_table$GO),
+]
+
+
+# ---------------------------------------------------------
+# Background universe
+# ---------------------------------------------------------
+
+
+all_proteins <- read.csv(
+  "all_proteins.csv"
+)
+
+background <- first_uniprot(
+  all_proteins$Protein.Ids
+)
+
+background <- unique(background)
+
+
+# ---------------------------------------------------------
+# GO enrichment loop
+# ---------------------------------------------------------
+
+ontologies <- c(
+  "Biological Process",
+  "Molecular Function",
+  "Cellular Component"
+)
+
+for (contrast in final_contrasts) {
+  
+  cat(
+    "\n==============================\n"
+  )
+  
+  cat(
+    "Running contrast:",
+    contrast,
+    "\n"
+  )
+  
+  cat(
+    "==============================\n"
+  )
+  
+  # -----------------------------------------------------
+  # Read differential expression results
+  # -----------------------------------------------------
+  
+  de <- read.csv(
+    paste0(
+      contrast,
+      ".csv"
+    )
+  )
+  
+  # Fold-change column
+  fc_col <- paste0(
+    contrast,
+    "_diff"
+  )
+  
+  # -----------------------------------------------------
+  # Upregulated proteins
+  # -----------------------------------------------------
+  
+  up <- de$Protein.Ids[
+    de[[fc_col]] > 0
+  ]
+  
+  # -----------------------------------------------------
+  # Downregulated proteins
+  # -----------------------------------------------------
+  
+  down <- de$Protein.Ids[
+    de[[fc_col]] < 0
+  ]
+  
+  cat(
+    "Upregulated proteins:",
+    length(up),
+    "\n"
+  )
+  
+  cat(
+    "Downregulated proteins:",
+    length(down),
+    "\n"
+  )
+  
+  # -----------------------------------------------------
+  # Run enrichment
+  # -----------------------------------------------------
+  
+  go_up <- run_go_binomial(
+    up,
+    go_table,
+    background
+  )
+  
+  go_down <- run_go_binomial(
+    down,
+    go_table,
+    background
+  )
+  
+  # -----------------------------------------------------
+  # Annotate GO terms
+  # -----------------------------------------------------
+  
+  go_up <- annotate_go_terms(
+    go_up
+  )
+  
+  go_down <- annotate_go_terms(
+    go_down
+  )
+  
+  # -----------------------------------------------------
+  # Save ontology-specific results
+  # -----------------------------------------------------
+  
+  for (ont in ontologies) {
+    
+    save_go_category(
+      go_up,
+      ont,
+      contrast,
+      "UP"
+    )
+    
+    save_go_category(
+      go_down,
+      ont,
+      contrast,
+      "DOWN"
+    )
+  }
+  
+  cat(
+    "Finished:",
+    contrast,
+    "\n"
+  )
+}
+```
+
+And, yeah... We are done for today, thank you for being here!
+
